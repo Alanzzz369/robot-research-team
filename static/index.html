@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nexus — Agent Pipeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    font-family: 'Sora', sans-serif;
+    color: #f5f3ff;
+    background:
+      radial-gradient(circle at 15% 20%, #7c3aed 0%, transparent 40%),
+      radial-gradient(circle at 85% 15%, #ec4899 0%, transparent 40%),
+      radial-gradient(circle at 50% 90%, #3b82f6 0%, transparent 45%),
+      #0f0a1e;
+    padding: 50px 20px 100px;
+  }
+
+  .container { max-width: 820px; margin: 0 auto; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 30px;
+    padding: 7px 16px;
+    font-size: 0.75rem;
+    color: #d8b4fe;
+    margin-bottom: 24px;
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px #4ade80; animation: livedot 1.5s infinite; }
+  @keyframes livedot { 50% { opacity: 0.4; } }
+
+  h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 18px;
+  }
+  h1 .grad {
+    background: linear-gradient(90deg, #a78bfa, #f472b6, #60a5fa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .lead {
+    color: #c4b5fd;
+    font-size: 1.05rem;
+    max-width: 540px;
+    line-height: 1.6;
+    margin-bottom: 44px;
+  }
+
+  .glass-card {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 22px;
+    padding: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    margin-bottom: 30px;
+  }
+
+  .input-glow {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  input#topicInput {
+    flex: 1;
+    min-width: 220px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    color: #f5f3ff;
+    font-family: 'Sora', sans-serif;
+    font-size: 1rem;
+    padding: 16px 18px;
+    outline: none;
+    transition: border-color 0.3s;
+  }
+  input#topicInput::placeholder { color: #8b7cae; }
+  input#topicInput:focus { border-color: #a78bfa; }
+
+  button#runBtn {
+    background: linear-gradient(90deg, #7c3aed, #ec4899);
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 16px 28px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+  }
+  button#runBtn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(124,58,237,0.5); }
+  button#runBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .agents-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 700px) { .agents-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .agent-tile {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 20px 14px;
+    text-align: center;
+    transition: all 0.4s;
+    position: relative;
+    overflow: hidden;
+  }
+  .agent-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+    opacity: 0;
+    transition: opacity 0.4s;
+    z-index: 0;
+  }
+  .agent-tile.active::before { opacity: 0.25; }
+  .agent-tile.done::before { opacity: 0.15; }
+  .agent-tile.active { border-color: #a78bfa; box-shadow: 0 0 25px rgba(167,139,250,0.35); transform: translateY(-3px); }
+  .agent-tile.done { border-color: rgba(167,139,250,0.5); }
+
+  .agent-emoji { font-size: 1.8rem; margin-bottom: 8px; position: relative; z-index: 1; filter: grayscale(1) opacity(0.5); transition: 0.4s; }
+  .agent-tile.active .agent-emoji, .agent-tile.done .agent-emoji { filter: grayscale(0) opacity(1); }
+
+  .agent-tile-name { font-weight: 600; font-size: 0.85rem; position: relative; z-index: 1; color: #c4b5fd; }
+  .agent-tile.active .agent-tile-name, .agent-tile.done .agent-tile-name { color: #fff; }
+
+  .agent-tile-tag {
+    font-size: 0.65rem;
+    color: #8b7cae;
+    margin-top: 6px;
+    position: relative;
+    z-index: 1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .agent-tile.active .agent-tile-tag { color: #fbbf24; }
+  .agent-tile.done .agent-tile-tag { color: #4ade80; }
+
+  .log-title { font-size: 0.75rem; letter-spacing: 1.5px; text-transform: uppercase; color: #8b7cae; margin-bottom: 14px; }
+
+  .log-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .log-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    color: #d8cff5;
+    opacity: 0;
+    animation: slideUp 0.4s forwards;
+  }
+  .log-item .bullet {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: linear-gradient(90deg, #a78bfa, #f472b6);
+    flex-shrink: 0;
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .report-card {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 22px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .report-card.show { opacity: 1; transform: translateY(0); }
+
+  .report-head {
+    background: linear-gradient(90deg, rgba(124,58,237,0.3), rgba(236,72,153,0.3));
+    padding: 22px 30px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .report-head .icon { font-size: 1.3rem; }
+  .report-head .title { font-weight: 700; font-size: 1.1rem; }
+
+  .report-body {
+    padding: 30px 34px 38px;
+    font-size: 0.98rem;
+    line-height: 1.8;
+    color: #e4defc;
+    white-space: pre-wrap;
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #7c3aed; border-radius: 4px; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 2.1rem; }
+    .glass-card { padding: 22px; }
+    .report-body { padding: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="badge"><span class="dot"></span> Autonomous pipeline online</div>
+
+  <h1>Research, handled by<br><span class="grad">four AI agents.</span></h1>
+  <p class="lead">Drop a topic in. Planner, Researcher, Critic, and Writer coordinate on their own and hand you back a finished report.</p>
+
+  <div class="glass-card">
+    <div class="input-glow">
+      <input id="topicInput" type="text" placeholder="What should the team research?" autocomplete="off" />
+      <button id="runBtn" onclick="runResearch()">Run Agents ✨</button>
+    </div>
+  </div>
+
+  <div class="glass-card">
+    <div class="agents-grid">
+      <div class="agent-tile" id="tile-planner">
+        <div class="agent-emoji">🧭</div>
+        <div class="agent-tile-name">Planner</div>
+        <div class="agent-tile-tag" id="tag-planner">idle</div>
+      </div>
+      <div class="agent-tile" id="tile-researcher">
+        <div class="agent-emoji">🔎</div>
+        <div class="agent-tile-name">Researcher</div>
+        <div class="agent-tile-tag" id="tag-researcher">idle</div>
+      </div>
+      <div class="agent-tile" id="tile-critic">
+        <div class="agent-emoji">🧪</div>
+        <div class="agent-tile-name">Critic</div>
+        <div class="agent-tile-tag" id="tag-critic">idle</div>
+      </div>
+      <div class="agent-tile" id="tile-writer">
+        <div class="agent-emoji">✍️</div>
+        <div class="agent-tile-name">Writer</div>
+        <div class="agent-tile-tag" id="tag-writer">idle</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="glass-card">
+    <div class="log-title">Live Activity</div>
+    <div class="log-feed" id="logFeed"></div>
+  </div>
+
+  <div class="report-card" id="reportCard">
+    <div class="report-head">
+      <span class="icon">📄</span>
+      <span class="title">Final Report</span>
+    </div>
+    <div class="report-body" id="reportPanel"></div>
+  </div>
+
+</div>
+
+<script>
+function resetUI() {
+  ["planner","researcher","critic","writer"].forEach(name => {
+    document.getElementById("tile-" + name).classList.remove("active", "done");
+    document.getElementById("tag-" + name).textContent = "idle";
+  });
+  document.getElementById("logFeed").innerHTML = "";
+  document.getElementById("reportPanel").textContent = "";
+  document.getElementById("reportCard").classList.remove("show");
+}
+
+function addLog(text) {
+  const feed = document.getElementById("logFeed");
+  const item = document.createElement("div");
+  item.className = "log-item";
+  item.innerHTML = '<span class="bullet"></span><span>' + text + '</span>';
+  feed.appendChild(item);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function setActive(name) {
+  ["planner","researcher","critic","writer"].forEach(n => {
+    document.getElementById("tile-" + n).classList.remove("active");
+  });
+  document.getElementById("tile-" + name).classList.add("active");
+  document.getElementById("tag-" + name).textContent = "working";
+}
+
+function setDone(name) {
+  const tile = document.getElementById("tile-" + name);
+  tile.classList.remove("active");
+  tile.classList.add("done");
+  document.getElementById("tag-" + name).textContent = "done";
+}
+
+function runResearch() {
+  const topic = document.getElementById("topicInput").value.trim();
+  if (!topic) return;
+
+  resetUI();
+  const btn = document.getElementById("runBtn");
+  btn.disabled = true;
+  btn.textContent = "Running...";
+
+  addLog('Started: "' + topic + '"');
+
+  const source = new EventSource(`/research-stream?topic=${encodeURIComponent(topic)}`);
+
+  source.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    if (data.node === "done") {
+      source.close();
+      btn.disabled = false;
+      btn.textContent = "Run Agents ✨";
+      addLog("Pipeline complete.");
+      return;
+    }
+
+    setActive(data.node);
+    if (data.log) addLog(data.log);
+
+    setTimeout(() => setDone(data.node), 400);
+
+    if (data.final_report) {
+      document.getElementById("reportPanel").textContent = data.final_report;
+      const card = document.getElementById("reportCard");
+      card.classList.add("show");
+      setTimeout(() => card.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+    }
+  };
+
+  source.onerror = function() {
+    addLog("Connection lost.");
+    btn.disabled = false;
+    btn.textContent = "Run Agents ✨";
+    source.close();
+  };
+}
+
+document.getElementById("topicInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") runResearch();
+});
+</script>
+
+</body>
+</html>    
